@@ -5,6 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 public class Player : MonoBehaviour {
 	const string TAG_GRABBABLE = "Grabbable";
+	static string foldBoxMessage = "(Hold F) Fold Box";
 
 	float walkSpeed = 7;
 	public float lookSensitivity = 1;
@@ -23,15 +24,16 @@ public class Player : MonoBehaviour {
 	float jumpTime = 0;
 	float maxJumpTime = 0.15f;
 
+	float foldTime = 0.9f;
+	float foldProgress = 0;
+
+	[SerializeField] LayerMask lookAtLayerMask;
 	[SerializeField] Transform camera;
 	[SerializeField] Transform grabSpot;
 	Rigidbody rb;
 
 	RaycastHit[] hits;
-
-	int layerNotHeld = 0; // Default
-	int layerHeld = 9; // HeldItem
-
+	
 	Coroutine grabCoroutine;
 	float maxGrabDistance = 4;
 	float grabSpeed = 5;
@@ -45,6 +47,8 @@ public class Player : MonoBehaviour {
 		rb = GetComponent<Rigidbody>();
 
 		hits = new RaycastHit[8];
+
+		GameManager.player = this;
 
 		LockMouse();
 	}
@@ -102,7 +106,6 @@ public class Player : MonoBehaviour {
 		bool oldShouldJump = shouldJump;
 		shouldJump = (shouldJump && Input.GetKey(KeyCode.Space)) || (Input.GetKeyDown(KeyCode.Space) && isGrounded);
 		if (shouldJump && !oldShouldJump) jumpTime = 0;
-		DebugInfo.Add($"shouldJump: {shouldJump}");
 	}
 
 	void UpdateVelocity() {
@@ -113,7 +116,7 @@ public class Player : MonoBehaviour {
 		velocity += transform.forward * moveVector.y * walkSpeed;
 		rb.velocity = velocity;
 
-		DebugInfo.Add($"Position: {transform.position}");
+		DebugInfo.Add($"position: {transform.position}");
 	}
 
 	void UpdateLookDirection() {
@@ -127,9 +130,36 @@ public class Player : MonoBehaviour {
 		}
 	}
 
+	void UpdateFolding(Transform t) {
+		if (t != null) {
+			Box b = t.GetComponent<Box>();
+			if (b != null && !b.isFolded) {
+				if (Input.GetKey(KeyCode.F)) {
+					float adjustedFloatTime = foldTime * b.transform.localScale.x;
+					if (foldProgress > adjustedFloatTime) {
+						b.Fold();
+						foldProgress = 0;
+					} else {
+						PlayerMessage.Add($"Folding box... <color={Colors.PROGRESS}>{(foldProgress/adjustedFloatTime) * 100:0}%</color>");
+						foldProgress += Time.deltaTime;
+					}
+				} else {
+					PlayerMessage.Add(foldBoxMessage);
+				}
+			}
+		}
+	}
+
+	void WhatsInTheBox(Transform t) {
+		Box box = t.GetComponent<Box>();
+		if (box != null) {
+			PlayerMessage.Add($"<color={Colors.ITEM_NAMES}>{box.contents}</color>");
+		}
+	}
+
 	void UpdateLookingAt() {
 		lookingAt = null;
-		int numHits = Physics.RaycastNonAlloc(camera.position, camera.forward, hits, maxGrabDistance);
+		int numHits = Physics.RaycastNonAlloc(camera.position, camera.forward, hits, maxGrabDistance, lookAtLayerMask, QueryTriggerInteraction.Ignore);
 		if (numHits > 0) {
 			Transform minDistanceTransform = null;
 			float minDistance = maxGrabDistance + 1;
@@ -143,6 +173,10 @@ public class Player : MonoBehaviour {
 			lookingAt = minDistanceTransform;
 		}
 		DebugInfo.Add($"lookingAt: {lookingAt?.name ?? "nothing"}");
+
+		if (Input.GetKeyUp(KeyCode.F)) {
+			foldProgress = 0;
+		}
 	}
 
 	IEnumerator GrabCoroutine() {
@@ -151,7 +185,8 @@ public class Player : MonoBehaviour {
 			Destroy(girb);
 		}
 
-		grabbedItem.gameObject.layer = layerHeld;
+		grabbedItem.gameObject.layer = PhysicsLayers.DEFAULT;
+		grabbedItem.GetComponent<IGrabbable>()?.OnGrab();
 
 		float progress = 0;
 		Vector3 initPos = grabbedItem.position;
@@ -171,6 +206,25 @@ public class Player : MonoBehaviour {
 		grabCoroutine = null;
 	}
 
+	public void LetGo() {
+		if (grabCoroutine != null) {
+			StopCoroutine(grabCoroutine);
+			grabCoroutine = null;
+		}
+
+		if (grabbedItem == null) return;
+
+		grabbedItem.SetParent(null);
+		Rigidbody girb = (Rigidbody)grabbedItem.gameObject.AddComponent(typeof(Rigidbody));
+		if (girb != null) {
+			girb.velocity = rb.velocity + Vector3.ClampMagnitude(grabbedItemVelocity, maxGrabbedItemVelocity);
+		}
+
+		grabbedItem.gameObject.layer = PhysicsLayers.DEFAULT;
+		grabbedItem.GetComponent<IGrabbable>()?.OnLetGo();
+		grabbedItem = null;
+	}
+
 	void UpdateGrab() {
 		if (Input.GetMouseButtonDown(0)) {
 			if (grabbedItem == null) {
@@ -179,18 +233,7 @@ public class Player : MonoBehaviour {
 					grabCoroutine = StartCoroutine(GrabCoroutine());
 				}
 			} else {
-				if (grabCoroutine != null) {
-					StopCoroutine(grabCoroutine);
-					grabCoroutine = null;
-				}
-				grabbedItem.SetParent(null);
-				Rigidbody girb = (Rigidbody)grabbedItem.gameObject.AddComponent(typeof(Rigidbody));
-				if (girb != null) {
-					girb.velocity = rb.velocity + Vector3.ClampMagnitude(grabbedItemVelocity, maxGrabbedItemVelocity);
-				}
-
-				grabbedItem.gameObject.layer = layerNotHeld;
-				grabbedItem = null;
+				LetGo();
 			}
 		}
 
@@ -212,12 +255,22 @@ public class Player : MonoBehaviour {
 		if (Input.GetKeyDown(KeyCode.M)) ToggleMouse();
 		#endif
 
+		if (GameManager.gameOver) return;
+
 		UpdateIsGrounded();
 		GetInput();
 		UpdateVelocity();
 		UpdateLookDirection();
 		UpdateLookingAt();
 		UpdateGrab();
+
+		if (grabbedItem != null) {
+			WhatsInTheBox(grabbedItem);
+			UpdateFolding(grabbedItem);
+		} else if (lookingAt != null) {
+			WhatsInTheBox(lookingAt);
+			UpdateFolding(lookingAt);
+		}
 	}
 
 	void FixedUpdate() {
