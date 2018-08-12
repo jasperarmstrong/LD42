@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using System;
 
 public enum GameOverReasons {
 	TOO_MANY_BOXES, LITTERING
@@ -58,7 +57,7 @@ public class GameManager : MonoBehaviour {
 		}
 	}
 
-	IEnumerator DoNextFrame(Action action) {
+	IEnumerator DoNextFrame(System.Action action) {
 		yield return null;
 		action?.Invoke();
 	}
@@ -100,7 +99,7 @@ public class GameManager : MonoBehaviour {
 		Rigidbody rb = player.GetComponent<Rigidbody>();
 		if (rb != null) {
 			rb.constraints = RigidbodyConstraints.None;
-			Vector2 vec = UnityEngine.Random.insideUnitCircle;
+			Vector2 vec = Random.insideUnitCircle;
 			rb.AddForceAtPosition(new Vector3(vec.x, 0, vec.y) * 25, player.transform.position + Vector3.up * 1.8f);
 		}
 	}
@@ -176,6 +175,7 @@ public class GameManager : MonoBehaviour {
 	void Update () {
 		#if UNITY_EDITOR
 		if (Input.GetKeyDown(KeyCode.M)) ToggleMouse();
+		if (Input.GetKeyDown(KeyCode.O)) ScreenCapture.CaptureScreenshot($"screenshot-{System.DateTime.Now.ToLongTimeString()}.png");
 		#endif
 
 		if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) TogglePause();

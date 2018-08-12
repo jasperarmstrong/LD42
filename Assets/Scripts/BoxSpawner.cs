@@ -58,14 +58,11 @@ public class BoxSpawner : MonoBehaviour {
 		minSpawnTime = defaultMinSpawnTime * spawnTimeMultiplier;
 		maxSpawnTime = defaultMaxSpawnTime * spawnTimeMultiplier;
 
-		float nextTime = Random.Range(minSpawnTime, maxSpawnTime);
-		#if UNITY_EDITOR
-		if (Input.GetKey(KeyCode.Period)) nextTime = -0.1f;
-		#endif
-		nextSpawnTime = nextTime;
+		nextSpawnTime = Random.Range(minSpawnTime, maxSpawnTime);
 	}
 
 	void Update () {
+		if (Input.GetKey(KeyCode.Period)) nextSpawnTime = -1f;
 		if (nextSpawnTime < 0) {
 			SpawnBox();
 		}

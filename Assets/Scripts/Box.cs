@@ -25,7 +25,7 @@ public class Box : MonoBehaviour, IGrabbable {
 		"Too Many Boxes: GOTY Edition",
 		"10 Collapsed Cardboard Boxes",
 		"More Pens than You Will Ever Need",
-		"A Hat for Your Cat",
+		"A Bowtie for Your Cat",
 		"12in. Gummy Bear",
 		"Hamburger Phone",
 	};
