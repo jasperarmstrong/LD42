@@ -63,7 +63,7 @@ public class RecyclingCan : MonoBehaviour {
 				candidate.transform.SetParent(boxSpots[boxes.Count]);
 				candidate.transform.localPosition = Vector3.zero;
 				candidate.transform.localRotation = Quaternion.identity;
-				candidate.transform.localScale = Vector3.one * 0.52f;
+				candidate.transform.localScale = Vector3.one * 0.48f;
 
 				boxes.Add(candidate);
 

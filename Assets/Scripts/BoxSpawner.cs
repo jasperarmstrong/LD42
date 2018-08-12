@@ -5,8 +5,8 @@ using UnityEngine;
 public class BoxSpawner : MonoBehaviour {
 	public BoxSpawner instance;
 
-	float defaultMinSpawnTime = 5;
-	float defaultMaxSpawnTime = 12;
+	float defaultMinSpawnTime = 4;
+	float defaultMaxSpawnTime = 10;
 	float minSpawnTime = 5;
 	float maxSpawnTime = 5;
 	float nextSpawnTime = 4;
@@ -54,7 +54,7 @@ public class BoxSpawner : MonoBehaviour {
 		numSpawned++;
 		if (!countForDifficulty) numSpawnedFree++;
 
-		spawnTimeMultiplier = Mathf.Clamp(1 - ((numSpawned - numSpawnedFree) * 0.015f), 0.3f, 1);
+		spawnTimeMultiplier = Mathf.Clamp(1 - ((numSpawned - numSpawnedFree) * 0.05f), 0.3f, 1);
 		minSpawnTime = defaultMinSpawnTime * spawnTimeMultiplier;
 		maxSpawnTime = defaultMaxSpawnTime * spawnTimeMultiplier;
 
@@ -71,6 +71,9 @@ public class BoxSpawner : MonoBehaviour {
 		}
 		DebugInfo.Add($"spawnTimeMultiplier: {spawnTimeMultiplier:0.000} [{minSpawnTime:0.00}s, {maxSpawnTime:0.00}s]");
 		DebugInfo.Add($"nextSpawnTime: {nextSpawnTime:0.00}s");
+
+		if (GameManager.isPaused) return;
+
 		nextSpawnTime -= Time.deltaTime;
 	}
 }

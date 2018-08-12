@@ -6,9 +6,10 @@ using UnityEngine;
 public class Player : MonoBehaviour {
 	const string TAG_GRABBABLE = "Grabbable";
 	static string foldBoxMessage = "(Hold F) Fold Box";
+	static string dropBoxMessage = "(LMB) Drop Box";
+	static string pickUpBoxMessage = "(LMB) Pick Up Box";
 
 	float walkSpeed = 7;
-	public float lookSensitivity = 1;
 	const float lookMultiplier = 200;
 
 	Vector2 moveVector;
@@ -28,7 +29,7 @@ public class Player : MonoBehaviour {
 	float foldProgress = 0;
 
 	[SerializeField] LayerMask lookAtLayerMask;
-	[SerializeField] Transform camera;
+	[SerializeField] Transform cam;
 	[SerializeField] Transform grabSpot;
 	Rigidbody rb;
 
@@ -49,26 +50,6 @@ public class Player : MonoBehaviour {
 		hits = new RaycastHit[8];
 
 		GameManager.player = this;
-
-		LockMouse();
-	}
-
-	void LockMouse() {
-		Cursor.lockState = CursorLockMode.Locked;
-		Cursor.visible = false;
-	}
-
-	void UnlockMouse() {
-		Cursor.lockState = CursorLockMode.None;
-		Cursor.visible = true;
-	}
-
-	void ToggleMouse() {
-		if (Cursor.visible) {
-			LockMouse();
-		} else {
-			UnlockMouse();
-		}
 	}
 
 	void UpdateIsGrounded() {
@@ -109,24 +90,28 @@ public class Player : MonoBehaviour {
 	}
 
 	void UpdateVelocity() {
-		Vector3 velocity = rb.velocity;
-		velocity.x = velocity.z = 0;
+		if (!GameManager.isPaused) {
+			Vector3 velocity = rb.velocity;
+			velocity.x = velocity.z = 0;
 
-		velocity += transform.right * moveVector.x * walkSpeed;
-		velocity += transform.forward * moveVector.y * walkSpeed;
-		rb.velocity = velocity;
+			velocity += transform.right * moveVector.x * walkSpeed;
+			velocity += transform.forward * moveVector.y * walkSpeed;
+			rb.velocity = velocity;
+		}
 
 		DebugInfo.Add($"position: {transform.position}");
 	}
 
 	void UpdateLookDirection() {
-		float lookFactor = lookSensitivity * lookMultiplier * Time.deltaTime;
+		if (GameManager.isPaused) return;
+
+		float lookFactor = GameManager.mouseSensitivity * lookMultiplier * Time.deltaTime;
 		transform.Rotate(0, mouseX * lookFactor * (invertY ? -1 : 1), 0);
-		camera.Rotate(-mouseY * lookFactor * (invertY ? -1 : 1), 0, 0);
-		if (camera.localRotation.x > 0.707f) {
-			camera.localRotation = Quaternion.Euler(90, 0, 0);
-		} else if (camera.localRotation.x < -0.707f) {
-			camera.localRotation = Quaternion.Euler(-90, 0, 0);
+		cam.Rotate(-mouseY * lookFactor * (invertY ? -1 : 1), 0, 0);
+		if (cam.localRotation.x > 0.707f) {
+			cam.localRotation = Quaternion.Euler(90, 0, 0);
+		} else if (cam.localRotation.x < -0.707f) {
+			cam.localRotation = Quaternion.Euler(-90, 0, 0);
 		}
 	}
 
@@ -136,7 +121,7 @@ public class Player : MonoBehaviour {
 			if (b != null && !b.isFolded) {
 				if (Input.GetKey(KeyCode.F)) {
 					float adjustedFloatTime = foldTime * b.transform.localScale.x;
-					if (foldProgress > adjustedFloatTime) {
+					if (foldProgress > adjustedFloatTime && !GameManager.isPaused) {
 						b.Fold();
 						foldProgress = 0;
 					} else {
@@ -154,12 +139,18 @@ public class Player : MonoBehaviour {
 		Box box = t.GetComponent<Box>();
 		if (box != null) {
 			PlayerMessage.Add($"<color={Colors.ITEM_NAMES}>{box.contents}</color>");
+		
+			if (t == grabbedItem) {
+				PlayerMessage.Add(dropBoxMessage);
+			} else if (t == lookingAt) {
+				PlayerMessage.Add(pickUpBoxMessage);
+			}
 		}
 	}
 
 	void UpdateLookingAt() {
 		lookingAt = null;
-		int numHits = Physics.RaycastNonAlloc(camera.position, camera.forward, hits, maxGrabDistance, lookAtLayerMask, QueryTriggerInteraction.Ignore);
+		int numHits = Physics.RaycastNonAlloc(cam.position, cam.forward, hits, maxGrabDistance, lookAtLayerMask, QueryTriggerInteraction.Ignore);
 		if (numHits > 0) {
 			Transform minDistanceTransform = null;
 			float minDistance = maxGrabDistance + 1;
@@ -174,7 +165,7 @@ public class Player : MonoBehaviour {
 		}
 		DebugInfo.Add($"lookingAt: {lookingAt?.name ?? "nothing"}");
 
-		if (Input.GetKeyUp(KeyCode.F)) {
+		if (Input.GetKeyUp(KeyCode.F) && !GameManager.isPaused) {
 			foldProgress = 0;
 		}
 	}
@@ -193,6 +184,8 @@ public class Player : MonoBehaviour {
 		Quaternion initRot = grabbedItem.localRotation;
 
 		while (progress < 1) {
+			if (GameManager.isPaused) yield return null;
+
 			progress += grabSpeed * Time.deltaTime;
 			grabbedItem.position = Vector3.Lerp(initPos, grabSpot.position, progress);
 			grabbedItem.rotation = Quaternion.Lerp(initRot, transform.rotation, progress);
@@ -226,7 +219,7 @@ public class Player : MonoBehaviour {
 	}
 
 	void UpdateGrab() {
-		if (Input.GetMouseButtonDown(0)) {
+		if (Input.GetMouseButtonDown(0) && !GameManager.isPaused) {
 			if (grabbedItem == null) {
 				if (lookingAt?.CompareTag(TAG_GRABBABLE) ?? false) {
 					grabbedItem = lookingAt;
@@ -251,10 +244,6 @@ public class Player : MonoBehaviour {
 	}
 	
 	void Update () {
-		#if UNITY_EDITOR
-		if (Input.GetKeyDown(KeyCode.M)) ToggleMouse();
-		#endif
-
 		if (GameManager.gameOver) return;
 
 		UpdateIsGrounded();

@@ -10,8 +10,6 @@ public class DebugInfo : MonoBehaviour {
 
 	static StringBuilder sb;
 
-	static bool isEnabled = true;
-
 	void ResetString() {
 		if (sb == null) sb = new StringBuilder();
 		sb.Clear();
@@ -21,7 +19,7 @@ public class DebugInfo : MonoBehaviour {
 		instance = this;
 		text = GetComponent<TextMeshProUGUI>();
 		ResetString();
-		transform.parent.gameObject.SetActive(isEnabled);
+		transform.parent.gameObject.SetActive(false);
 	}
 
 	void LateUpdate() {
